@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Swing Trade Simulator</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0f1117;color:#e2e8f0;min-height:100vh;display:flex;flex-direction:column}
+
+/* ── layout ── */
+.app{display:flex;flex:1;min-height:0}
+.sidebar{width:220px;min-width:220px;background:#13161f;border-right:1px solid #2d3748;display:flex;flex-direction:column;padding:0}
+.main{flex:1;overflow-y:auto;padding:24px 20px}
+
+/* ── sidebar ── */
+.sidebar-hdr{padding:14px 14px 10px;border-bottom:1px solid #2d3748}
+.sidebar-hdr h1{font-size:1rem;font-weight:700;color:#f8fafc}
+.sidebar-hdr p{font-size:0.72rem;color:#64748b;margin-top:2px}
+.stock-list{flex:1;overflow-y:auto;padding:8px 0}
+.stock-item{display:flex;align-items:center;gap:6px;padding:8px 12px;cursor:pointer;border-left:3px solid transparent;transition:background .12s}
+.stock-item:hover{background:#1e2330}
+.stock-item.active{background:#1e2330;border-left-color:#3b82f6}
+.stock-name{flex:1;font-size:0.85rem;font-weight:500;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stock-item.active .stock-name{color:#60a5fa}
+.stock-meta{font-size:0.68rem;color:#64748b}
+.stock-del{background:none;border:none;color:#475569;cursor:pointer;font-size:0.9rem;padding:2px 4px;border-radius:4px;line-height:1}
+.stock-del:hover{color:#f87171;background:#450a0a}
+.add-stock-btn{margin:10px 12px;background:#1e2330;border:1px dashed #2d3748;border-radius:7px;padding:8px;font-size:0.8rem;color:#64748b;cursor:pointer;text-align:center;transition:all .15s}
+.add-stock-btn:hover{border-color:#3b82f6;color:#60a5fa}
+
+/* ── main ── */
+.page-title{font-size:1.1rem;font-weight:700;color:#f8fafc;margin-bottom:2px}
+.page-sub{font-size:0.78rem;color:#64748b;margin-bottom:20px}
+.card{background:#1e2330;border:1px solid #2d3748;border-radius:10px;padding:16px;margin-bottom:16px}
+.card h2{font-size:0.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#64748b;margin-bottom:12px}
+.grid{display:grid;gap:10px}
+.g3{grid-template-columns:1fr 1fr 1fr}
+.g2{grid-template-columns:1fr 1fr}
+label{display:block;font-size:0.75rem;color:#94a3b8;margin-bottom:3px}
+input[type=number],input[type=text]{width:100%;background:#0f1117;border:1px solid #2d3748;border-radius:6px;padding:6px 10px;color:#f8fafc;font-size:0.88rem;outline:none}
+input:focus{border-color:#3b82f6}
+.btn{background:#3b82f6;color:#fff;border:none;border-radius:7px;padding:8px 20px;font-size:0.88rem;font-weight:600;cursor:pointer}
+.btn:hover{background:#2563eb}
+.btn-sm{padding:4px 10px;font-size:0.75rem;border-radius:5px}
+.btn-ghost{background:transparent;border:1px solid #2d3748;color:#94a3b8}
+.btn-ghost:hover{border-color:#3b82f6;color:#60a5fa}
+.btn-danger{background:#7f1d1d;color:#fca5a5}
+.btn-danger:hover{background:#991b1b}
+.err{color:#f87171;font-size:0.78rem;margin-left:10px}
+.srow{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #2d3748}
+.srow:last-child{border-bottom:none}
+.lbl{color:#94a3b8;font-size:0.82rem}
+.val{font-weight:600;font-size:0.86rem}
+.r{color:#f87171}.g{color:#4ade80}.y{color:#facc15}.b{color:#60a5fa}
+.bar-wrap{background:#0f1117;border-radius:99px;height:8px;overflow:hidden;margin-top:8px}
+.bar-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,#3b82f6,#4ade80);transition:width .4s}
+.prog-hdr{display:flex;justify-content:space-between;font-size:0.74rem;color:#64748b;margin-bottom:3px}
+.overflow{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:0.75rem}
+th{text-align:right;padding:6px 8px;color:#64748b;font-size:0.67rem;text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid #2d3748;white-space:nowrap}
+th:first-child{text-align:center}
+td{text-align:right;padding:4px 8px;border-bottom:1px solid #1a1f2e}
+td:first-child{text-align:center;color:#64748b}
+tr:hover:not(.committed-row) td{background:#252d3d}
+.badge{display:inline-block;padding:2px 6px;border-radius:99px;font-size:0.65rem;font-weight:700}
+.bg{background:#14532d;color:#4ade80}
+.br{background:#450a0a;color:#f87171}
+.by{background:#422006;color:#facc15}
+.bp{background:#1e1b4b;color:#a5b4fc}
+.hint{font-size:0.74rem;color:#64748b;margin-top:5px;line-height:1.5}
+
+/* editable override cells */
+.ov{background:#0f1117;border:1px solid #2d3748;border-radius:5px;padding:3px 5px;color:#f8fafc;font-size:0.74rem;width:76px;text-align:right;outline:none}
+.ov:focus{border-color:#f59e0b}
+.ov.overridden{border-color:#f59e0b;background:#1c1708;color:#fcd34d}
+
+/* committed rows */
+.committed-row td{background:#0d1a0d !important;color:#4ade80 !important}
+.committed-row td.r{color:#86efac !important}
+.committed-row .ov{background:#0d1a0d;border-color:#166534;color:#4ade80;pointer-events:none}
+.committed-row .commit-btn{display:none}
+.next-action-row td{background:#0f172a !important}
+.next-action-row td:first-child{color:#60a5fa !important}
+
+/* empty state */
+.empty{text-align:center;padding:60px 20px;color:#475569}
+.empty h3{font-size:1rem;color:#64748b;margin-bottom:8px}
+.empty p{font-size:0.82rem}
+
+/* modal */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:100}
+.modal{background:#1e2330;border:1px solid #2d3748;border-radius:12px;padding:24px;min-width:300px;max-width:400px}
+.modal h3{font-size:1rem;font-weight:700;margin-bottom:16px;color:#f8fafc}
+.modal-actions{display:flex;gap:8px;margin-top:16px;justify-content:flex-end}
+
+@media(max-width:650px){.sidebar{width:180px;min-width:180px}.g3{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+
+<!-- Add Stock Modal -->
+<div id="modal" class="modal-bg" style="display:none">
+  <div class="modal">
+    <h3 id="modal-title">Add Stock</h3>
+    <div style="margin-bottom:10px">
+      <label>Stock name / ticker</label>
+      <input type="text" id="modal-name" placeholder="e.g. BSE, INFY, RELIANCE" maxlength="30">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-sm" onclick="confirmModal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="app">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-hdr">
+      <h1>Swing Simulator</h1>
+      <p>Loss recovery tracker</p>
+    </div>
+    <div class="stock-list" id="stock-list"></div>
+    <div class="add-stock-btn" onclick="openAddModal()">+ Add Stock</div>
+  </div>
+
+  <!-- Main -->
+  <div class="main" id="main-area">
+    <div class="empty">
+      <h3>No stocks yet</h3>
+      <p>Add a stock from the sidebar to start simulating your recovery plan.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const f = n => n.toLocaleString('en-IN',{maximumFractionDigits:2});
+const STORE_KEY = 'swing_sim_v1';
+
+// ── persistence ────────────────────────────────────────────────────────────
+function loadAll() {
+  try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch { return {}; }
+}
+function saveAll(data) { localStorage.setItem(STORE_KEY, JSON.stringify(data)); }
+function loadStock(id) { return loadAll()[id] || null; }
+function saveStock(id, data) {
+  const all = loadAll(); all[id] = data; saveAll(all);
+}
+function deleteStock(id) {
+  const all = loadAll(); delete all[id]; saveAll(all);
+}
+
+// ── state ──────────────────────────────────────────────────────────────────
+let activeId = null;
+// per-stock runtime state (not persisted — recomputed on load)
+const RT = {}; // RT[id] = { rows, overrides, committed, params }
+
+// ── modal ──────────────────────────────────────────────────────────────────
+let modalMode = 'add'; // 'add' | 'rename'
+let modalTargetId = null;
+function openAddModal() { modalMode='add'; document.getElementById('modal-title').textContent='Add Stock'; document.getElementById('modal-name').value=''; document.getElementById('modal').style.display='flex'; setTimeout(()=>document.getElementById('modal-name').focus(),50); }
+function openRenameModal(id) { modalMode='rename'; modalTargetId=id; document.getElementById('modal-title').textContent='Rename Stock'; document.getElementById('modal-name').value=loadStock(id)?.name||''; document.getElementById('modal').style.display='flex'; setTimeout(()=>document.getElementById('modal-name').focus(),50); }
+function closeModal() { document.getElementById('modal').style.display='none'; }
+function confirmModal() {
+  const name = document.getElementById('modal-name').value.trim();
+  if (!name) return;
+  if (modalMode === 'add') {
+    const id = 'stock_' + Date.now();
+    saveStock(id, { name, params: null, overrides: {}, committed: {} });
+    RT[id] = { rows:[], overrides:{}, committed:{}, params:null };
+    renderSidebar();
+    selectStock(id);
+  } else {
+    const s = loadStock(modalTargetId); s.name = name; saveStock(modalTargetId, s);
+    renderSidebar();
+    if (activeId === modalTargetId) renderMain(modalTargetId);
+  }
+  closeModal();
+}
+document.getElementById('modal').addEventListener('click', e => { if(e.target===document.getElementById('modal')) closeModal(); });
+document.addEventListener('keydown', e => { if(e.key==='Escape') closeModal(); if(e.key==='Enter'&&document.getElementById('modal').style.display!=='none') confirmModal(); });
+
+// ── sidebar ────────────────────────────────────────────────────────────────
+function renderSidebar() {
+  const all = loadAll();
+  const ids = Object.keys(all);
+  const el  = document.getElementById('stock-list');
+  if (!ids.length) { el.innerHTML = '<div style="padding:12px 14px;font-size:0.78rem;color:#475569">No stocks added yet</div>'; return; }
+  el.innerHTML = ids.map(id => {
+    const s    = all[id];
+    const rt   = RT[id];
+    const done = rt ? rt.rows.filter(r=>r.oldLeft===0).length > 0 : false;
+    const comm = s.committed ? Object.keys(s.committed).length : 0;
+    const meta = s.params ? (comm ? `${comm} cycles done` : 'configured') : 'not set up';
+    return `<div class="stock-item ${id===activeId?'active':''}" onclick="selectStock('${id}')">
+      <div style="flex:1;min-width:0">
+        <div class="stock-name">${s.name}</div>
+        <div class="stock-meta">${meta}</div>
+      </div>
+      <button class="stock-del" title="Delete" onclick="event.stopPropagation();removeStock('${id}')">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function removeStock(id) {
+  if (!confirm(`Delete "${loadStock(id)?.name}"? This cannot be undone.`)) return;
+  deleteStock(id); delete RT[id];
+  if (activeId === id) { activeId = null; document.getElementById('main-area').innerHTML = '<div class="empty"><h3>No stocks yet</h3><p>Add a stock from the sidebar.</p></div>'; }
+  renderSidebar();
+}
+
+function selectStock(id) {
+  activeId = id;
+  if (!RT[id]) {
+    const s = loadStock(id);
+    RT[id] = { rows:[], overrides: s.overrides||{}, committed: s.committed||{}, params: s.params||null };
+    if (RT[id].params) recompute(id);
+  }
+  renderSidebar();
+  renderMain(id);
+}
+
+// ── main panel ────────────────────────────────────────────────────────────
+function renderMain(id) {
+  const s      = loadStock(id);
+  const rt     = RT[id];
+  const p      = rt.params;
+  const area   = document.getElementById('main-area');
+
+  area.innerHTML = `
+    <div class="page-title">${s.name}</div>
+    <div class="page-sub">% based swing recovery — edit any future cycle's prices to reflect reality</div>
+
+    <div class="card">
+      <h2>Existing Position</h2>
+      <div class="grid g3">
+        <div><label>Shares held</label><input type="number" id="f_oQty" value="${p?.oQty??100}" min="1"></div>
+        <div><label>Bought at (₹)</label><input type="number" id="f_oBuy" value="${p?.oBuy??3750}" min="1"></div>
+        <div><label>First swing buy price (₹)</label><input type="number" id="f_entry" value="${p?.entry??3200}" min="1"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Swing Rules</h2>
+      <div class="grid g3">
+        <div>
+          <label>Sell at % above buy</label>
+          <input type="number" id="f_sellPct" value="${p?.sellPct??5}" min="0.01" max="100" step="0.1">
+          <p class="hint">sell = buy × (1 + %)</p>
+        </div>
+        <div>
+          <label>Rebuy after % drop from sell</label>
+          <input type="number" id="f_dropPct" value="${p?.dropPct??2}" min="0.01" max="100" step="0.1">
+          <p class="hint">next buy = sell × (1 − %)</p>
+        </div>
+        <div>
+          <label>Brokerage % (per trade)</label>
+          <input type="number" id="f_brok" value="${p?.brok??0.1}" min="0" max="5" step="0.01">
+        </div>
+      </div>
+      <div style="margin-top:10px;max-width:220px">
+        <label>First cycle swing quantity</label>
+        <input type="number" id="f_sQty" value="${p?.sQty??100}" min="1">
+      </div>
+    </div>
+
+    <div class="card" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <button class="btn" onclick="simulate('${id}')">Simulate</button>
+      <button class="btn btn-ghost btn-sm" onclick="openRenameModal('${id}')">Rename</button>
+      <span class="err" id="sim-err"></span>
+    </div>
+
+    <div id="results-area"></div>
+  `;
+
+  if (rt.rows.length) renderResults(id);
+}
+
+// ── simulation ────────────────────────────────────────────────────────────
+function simulate(id) {
+  const err = document.getElementById('sim-err');
+  err.textContent = '';
+  const oQty    = +document.getElementById('f_oQty').value;
+  const oBuy    = +document.getElementById('f_oBuy').value;
+  const entry   = +document.getElementById('f_entry').value;
+  const sellPct = +document.getElementById('f_sellPct').value / 100;
+  const dropPct = +document.getElementById('f_dropPct').value / 100;
+  const brok    = +document.getElementById('f_brok').value / 100;
+  const sQty    = +document.getElementById('f_sQty').value;
+  if (sellPct<=0) { err.textContent='Sell % must be positive.'; return; }
+  if (dropPct<=0) { err.textContent='Drop % must be positive.'; return; }
+  const firstSell = entry*(1+sellPct);
+  if (firstSell>=oBuy) { err.textContent=`First sell ₹${f(firstSell)} ≥ original buy ₹${f(oBuy)} — no loss to recover.`; return; }
+
+  const rt = RT[id];
+  rt.params = { oQty, oBuy, entry, sellPct, dropPct, brok, sQty };
+  // keep existing committed and overrides; reset overrides only for non-committed future cycles
+  // clear overrides for cycles beyond last committed
+  const lastCommitted = Math.max(0, ...Object.keys(rt.committed).map(Number));
+  Object.keys(rt.overrides).forEach(c => { if (+c > lastCommitted) delete rt.overrides[+c]; });
+
+  const s = loadStock(id);
+  s.params = rt.params; s.overrides = rt.overrides; saveStock(id, s);
+  recompute(id);
+  renderSidebar();
+  renderResults(id);
+  document.getElementById('results-area').scrollIntoView({behavior:'smooth'});
+}
+
+function recompute(id) {
+  const rt = RT[id];
+  const { oQty, oBuy, entry, sellPct, dropPct, brok, sQty } = rt.params;
+  const initLoss = oQty * (oBuy - entry*(1+sellPct));
+
+  let capital = sQty * entry;
+  let buyPrice = entry;
+  let oldLeft  = oQty;
+  let totalRecovered = 0;
+  rt.rows = [];
+
+  for (let c=1; c<=1000 && oldLeft>0; c++) {
+    const ov       = rt.overrides[c] || {};
+    const comm     = rt.committed[c];
+
+    // committed cycles use the locked-in actual prices
+    const thisBuy  = comm ? comm.buyPrice  : (ov.buy  !== undefined ? ov.buy  : buyPrice);
+    const thisSell = comm ? comm.sellPrice : (ov.sell !== undefined ? ov.sell : thisBuy*(1+sellPct));
+    const lossPerOld = oBuy - thisSell;
+
+    if (lossPerOld <= 0) {
+      const qty      = Math.floor(capital/thisBuy);
+      const buyCost  = qty*thisBuy, buyBrok=buyCost*brok;
+      const sellRev  = qty*thisSell, sellBrok=sellRev*brok;
+      const swingPnL = sellRev-buyCost-buyBrok-sellBrok;
+      const oldRev   = oldLeft*thisSell, oldBrok=oldRev*brok;
+      const oldPnL   = oldLeft*(thisSell-oBuy)-oldBrok;
+      totalRecovered += swingPnL + oldLeft*(thisSell-oBuy);
+      const nextBuy = thisSell*(1-dropPct);
+      rt.rows.push({c,buyPrice:thisBuy,sellPrice:thisSell,nextBuy,qty,buyCost,swingPnL,oldSold:oldLeft,oldPnL,totalRecovered,remLoss:0,oldLeft:0,isComm:!!comm,isOv:!!ov.buy||!!ov.sell});
+      oldLeft=0; break;
+    }
+
+    const qty = Math.floor(capital/thisBuy);
+    if (qty<1) break;
+    const buyCost=qty*thisBuy, buyBrok=buyCost*brok;
+    const sellRev=qty*thisSell, sellBrok=sellRev*brok;
+    const swingPnL=sellRev-buyCost-buyBrok-sellBrok;
+    const canCover=Math.floor(swingPnL/lossPerOld);
+    const oldSold=Math.min(canCover,oldLeft);
+    const oldRev=oldSold*thisSell, oldBrok=oldRev*brok;
+    const oldPnL=oldSold*(thisSell-oBuy)-oldBrok;
+    totalRecovered+=swingPnL;
+    oldLeft-=oldSold;
+    capital=sellRev-sellBrok-buyBrok+oldRev-oldBrok;
+    const remLoss=Math.max(0, oQty*(oBuy-thisSell)-totalRecovered);
+    const nextBuy=thisSell*(1-dropPct);
+    rt.rows.push({c,buyPrice:thisBuy,sellPrice:thisSell,nextBuy,qty,buyCost,swingPnL,oldSold,oldPnL,totalRecovered,remLoss,oldLeft,isComm:!!comm,isOv:!!ov.buy||!!ov.sell});
+    buyPrice=nextBuy;
+  }
+}
+
+// ── render results ────────────────────────────────────────────────────────
+function renderResults(id) {
+  const rt     = RT[id];
+  const rows   = rt.rows;
+  const p      = rt.params;
+  if (!rows.length) return;
+  const initLoss = p.oQty*(p.oBuy - p.entry*(1+p.sellPct));
+  const last     = rows[rows.length-1];
+  const rec      = Math.min(last.totalRecovered, initLoss);
+  const pct      = initLoss>0 ? Math.min(100, rec/initLoss*100).toFixed(1) : '100.0';
+  const firstNextCycle = rows.find(r=>!r.isComm);
+
+  const area = document.getElementById('results-area');
+  area.innerHTML = `
+    <div class="card">
+      <h2>Recovery Summary</h2>
+      <div id="sum-stats">
+        <div class="srow"><span class="lbl">Total loss to recover</span><span class="val r">₹${f(Math.max(0,initLoss))}</span></div>
+        <div class="srow"><span class="lbl">Cycles to complete</span><span class="val b">${rows.length}</span></div>
+        <div class="srow"><span class="lbl">Cycles committed</span><span class="val g">${Object.keys(rt.committed).length}</span></div>
+        <div class="srow"><span class="lbl">Total swing profit earned</span><span class="val g">₹${f(rows.reduce((s,r)=>s+r.swingPnL,0))}</span></div>
+        <div class="srow"><span class="lbl">Loss recovered so far</span><span class="val ${last.remLoss<=0?'g':'y'}">₹${f(rec)} (${pct}%)</span></div>
+        <div class="srow"><span class="lbl">Old shares still held</span><span class="val ${last.oldLeft===0?'g':'r'}">${last.oldLeft} / ${p.oQty}</span></div>
+        ${firstNextCycle ? `<div class="srow"><span class="lbl">Next action</span><span class="val b">Cycle ${firstNextCycle.c} — buy at ₹${f(firstNextCycle.buyPrice)}, sell at ₹${f(firstNextCycle.sellPrice)}</span></div>` : ''}
+      </div>
+      <div style="margin-top:12px">
+        <div class="prog-hdr"><span>Old shares sold</span><span>${p.oQty-last.oldLeft} / ${p.oQty}</span></div>
+        <div class="bar-wrap"><div class="bar-fill" style="width:${pct}%"></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Cycles
+        <span style="font-size:0.68rem;color:#64748b;font-weight:400;text-transform:none;letter-spacing:0">
+          — committed cycles are locked &nbsp;|&nbsp; edit Buy/Sell on future cycles to override &nbsp;|&nbsp; hit ✓ to commit a completed cycle
+        </span>
+      </h2>
+      <div class="overflow">
+        <table>
+          <thead><tr>
+            <th>#</th><th>Buy Price (₹)</th><th>Sell Price (₹)</th><th>Next Buy (₹)</th>
+            <th>Swing Qty</th><th>Swing P&L (₹)</th><th>Old Sold</th><th>Old P&L (₹)</th>
+            <th>Cumul. Recovered (₹)</th><th>Remaining Loss (₹)</th><th>Old Left</th><th>Status</th><th></th>
+          </tr></thead>
+          <tbody id="cycle-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  `;
+  renderCycleRows(id, initLoss);
+}
+
+function renderCycleRows(id, initLoss) {
+  const rt   = RT[id];
+  const tb   = document.getElementById('cycle-tbody');
+  if (!tb) return;
+  tb.innerHTML = '';
+  const firstUncommitted = rt.rows.find(r=>!r.isComm);
+
+  rt.rows.forEach(r => {
+    const isNext = firstUncommitted && r.c === firstUncommitted.c;
+    const done   = r.oldLeft===0;
+    const near   = !done && r.remLoss < initLoss*0.1;
+    let badge;
+    if (r.isComm)      badge = '<span class="badge bp">Committed</span>';
+    else if (done)     badge = '<span class="badge bg">Done</span>';
+    else if (isNext)   badge = '<span class="badge b" style="background:#1e3a5f">▶ Next</span>';
+    else if (near)     badge = '<span class="badge by">Near</span>';
+    else               badge = '<span class="badge br">Pending</span>';
+
+    const ovBuy  = rt.overrides[r.c]?.buy;
+    const ovSell = rt.overrides[r.c]?.sell;
+
+    const buyCell  = r.isComm
+      ? `<span class="g">₹${f(r.buyPrice)}</span>`
+      : `<input class="ov ${ovBuy!==undefined?'overridden':''}" type="number" value="${r.buyPrice.toFixed(2)}" step="0.5" onchange="setOv('${id}',${r.c},'buy',this)" onblur="setOv('${id}',${r.c},'buy',this)">`;
+    const sellCell = r.isComm
+      ? `<span class="g">₹${f(r.sellPrice)}</span>`
+      : `<input class="ov ${ovSell!==undefined?'overridden':''}" type="number" value="${r.sellPrice.toFixed(2)}" step="0.5" onchange="setOv('${id}',${r.c},'sell',this)" onblur="setOv('${id}',${r.c},'sell',this)">`;
+
+    const commitBtn = r.isComm
+      ? ''
+      : `<button class="btn btn-sm commit-btn" title="Commit this cycle as done" onclick="commitCycle('${id}',${r.c})" style="background:#14532d;color:#4ade80;font-size:0.68rem;padding:3px 8px">✓ Commit</button>`;
+
+    const tr = document.createElement('tr');
+    if (r.isComm)  tr.classList.add('committed-row');
+    if (isNext)    tr.classList.add('next-action-row');
+    tr.innerHTML = `
+      <td>${r.c}</td>
+      <td>${buyCell}</td>
+      <td>${sellCell}</td>
+      <td>₹${f(r.nextBuy)}</td>
+      <td>${r.qty}</td>
+      <td class="g">+₹${f(r.swingPnL)}</td>
+      <td>${r.oldSold}</td>
+      <td class="r">-₹${f(Math.abs(r.oldPnL))}</td>
+      <td class="g">₹${f(r.totalRecovered)}</td>
+      <td class="${r.remLoss<=0?'g':'r'}">₹${f(r.remLoss)}</td>
+      <td>${r.oldLeft}</td>
+      <td>${badge}</td>
+      <td>${commitBtn}</td>
+    `;
+    tb.appendChild(tr);
+  });
+}
+
+// ── overrides ─────────────────────────────────────────────────────────────
+function setOv(id, cycle, field, input) {
+  const val = parseFloat(input.value);
+  const rt  = RT[id];
+  if (isNaN(val)||val<=0) { if(rt.overrides[cycle]) delete rt.overrides[cycle][field]; }
+  else { if(!rt.overrides[cycle]) rt.overrides[cycle]={}; rt.overrides[cycle][field]=val; }
+  const s = loadStock(id); s.overrides = rt.overrides; saveStock(id, s);
+  const p = rt.params;
+  recompute(id);
+  const initLoss = p.oQty*(p.oBuy-p.entry*(1+p.sellPct));
+  refreshSummary(id, initLoss);
+  renderCycleRows(id, initLoss);
+}
+
+// ── commit ────────────────────────────────────────────────────────────────
+function commitCycle(id, cycle) {
+  const rt  = RT[id];
+  const row = rt.rows.find(r=>r.c===cycle);
+  if (!row) return;
+  rt.committed[cycle] = { buyPrice: row.buyPrice, sellPrice: row.sellPrice };
+  const s = loadStock(id); s.committed = rt.committed; saveStock(id, s);
+  recompute(id);
+  renderSidebar();
+  const p = rt.params;
+  const initLoss = p.oQty*(p.oBuy-p.entry*(1+p.sellPct));
+  refreshSummary(id, initLoss);
+  renderCycleRows(id, initLoss);
+}
+
+function refreshSummary(id, initLoss) {
+  const rt   = RT[id];
+  const rows = rt.rows;
+  const p    = rt.params;
+  if (!rows.length) return;
+  const last = rows[rows.length-1];
+  const rec  = Math.min(last.totalRecovered, initLoss);
+  const pct  = initLoss>0 ? Math.min(100,rec/initLoss*100).toFixed(1) : '100.0';
+  const firstNextCycle = rows.find(r=>!r.isComm);
+  const el = document.getElementById('sum-stats');
+  if (!el) return;
+  el.innerHTML = `
+    <div class="srow"><span class="lbl">Total loss to recover</span><span class="val r">₹${f(Math.max(0,initLoss))}</span></div>
+    <div class="srow"><span class="lbl">Cycles to complete</span><span class="val b">${rows.length}</span></div>
+    <div class="srow"><span class="lbl">Cycles committed</span><span class="val g">${Object.keys(rt.committed).length}</span></div>
+    <div class="srow"><span class="lbl">Total swing profit earned</span><span class="val g">₹${f(rows.reduce((s,r)=>s+r.swingPnL,0))}</span></div>
+    <div class="srow"><span class="lbl">Loss recovered so far</span><span class="val ${last.remLoss<=0?'g':'y'}">₹${f(rec)} (${pct}%)</span></div>
+    <div class="srow"><span class="lbl">Old shares still held</span><span class="val ${last.oldLeft===0?'g':'r'}">${last.oldLeft} / ${p.oQty}</span></div>
+    ${firstNextCycle ? `<div class="srow"><span class="lbl">Next action</span><span class="val b">Cycle ${firstNextCycle.c} — buy at ₹${f(firstNextCycle.buyPrice)}, sell at ₹${f(firstNextCycle.sellPrice)}</span></div>` : ''}
+  `;
+  const bar = document.querySelector('.bar-fill');
+  if (bar) bar.style.width = pct + '%';
+  const prog = document.querySelector('.prog-hdr span:last-child');
+  if (prog) prog.textContent = `${p.oQty-last.oldLeft} / ${p.oQty}`;
+}
+
+// ── init ───────────────────────────────────────────────────────────────────
+renderSidebar();
+// auto-select first stock if any
+const firstId = Object.keys(loadAll())[0];
+if (firstId) selectStock(firstId);
+</script>
+</body>
+</html>
